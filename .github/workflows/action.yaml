@@ -1,0 +1,62 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches: [ "main" ]
+
+defaults:
+  run:
+    working-directory: ./
+    shell: bash
+
+env:
+  REGISTRY: ghcr.io
+  ORGANISATION_NAME: philwelz
+
+jobs:
+  prepare:
+    name: prepare
+    runs-on: ubuntu-latest
+    outputs:
+      SHA_SHORT: ${{ env.COMMIT_SHORT_SHA }}
+      REGISTRY: ${{ env.REGISTRY }}
+      ORGANISATION_NAME: ${{ env.ORGANISATION_NAME }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set short git commit SHA
+        id: short-sha
+        run: |
+          calculatedSha=$(git rev-parse --short ${{ github.sha }})
+          echo "COMMIT_SHORT_SHA=$calculatedSha" >> $GITHUB_ENV
+  build:
+    name: build
+    uses: ./.github/workflows/docker-build.yaml
+    needs: [prepare]
+    with:
+      REGISTRY: ${{ needs.prepare.outputs.REGISTRY }}
+      ORGANISATION_NAME: ${{ needs.prepare.outputs.ORGANISATION_NAME }}
+      COMMIT_SHORT_SHA: ${{ needs.prepare.outputs.SHA_SHORT }}
+  patch:
+    name: patch
+    uses: ./.github/workflows/patch-image.yaml
+    if: github.event_name != 'pull_request'
+    needs: [prepare,build]
+    with:
+      REGISTRY: ${{ needs.prepare.outputs.REGISTRY }}
+      ORGANISATION_NAME: ${{ needs.prepare.outputs.ORGANISATION_NAME }}
+      COMMIT_SHORT_SHA: ${{ needs.prepare.outputs.SHA_SHORT }}
+  sign:
+    name: sign
+    uses: ./.github/workflows/sign-image.yaml
+    if: github.event_name != 'pull_request'
+    needs: [prepare,build,patch]
+    with:
+      REGISTRY: ${{ needs.prepare.outputs.REGISTRY }}
+      ORGANISATION_NAME: ${{ needs.prepare.outputs.ORGANISATION_NAME }}
+      COMMIT_SHORT_SHA: ${{ needs.prepare.outputs.SHA_SHORT }}
+    

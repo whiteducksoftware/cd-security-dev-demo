@@ -1,0 +1,134 @@
+name: Patch image
+
+on:
+  workflow_call:
+    inputs:
+      ### Values from CICD Workflow ###
+      REGISTRY:
+        required: true
+        type: string
+        description: 'The Environemnt which should be used.'
+      ORGANISATION_NAME:
+        type: string
+        required: true
+        description: 'The Subscription ID which should be used.'
+      COMMIT_SHORT_SHA:
+        type: string
+        required: true
+        description: 'The Subscription ID which should be used.'
+
+env:
+  SBOM: '${{ inputs.COMMIT_SHORT_SHA }}-patched-sbom.cdx.json'
+  IMAGE: '${{ inputs.REGISTRY }}/${{ inputs.ORGANISATION_NAME }}/example:${{ inputs.COMMIT_SHORT_SHA }}'
+  TAG: '${{ inputs.COMMIT_SHORT_SHA }}-patched'
+
+jobs:
+  patch-image:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write # needed for publishing the patched image to the GitHub Container Registry
+
+    steps:
+      - name: Set up Docker Buildx
+        # https://github.com/docker/setup-buildx-action
+        uses: docker/setup-buildx-action@v3.3.0
+
+      - name: Generate Trivy Report
+        # https://github.com/aquasecurity/trivy-action/tree/0.16.1
+        # Todo versioning
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          format: 'json'
+          output: 'report.json'
+          ignore-unfixed: true
+          vuln-type: 'os'
+          image-ref: ${{ env.IMAGE }}
+        # needed for private repos
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ github.token }}
+
+      - name: Upload Trivy Report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 'trivy-report.json'
+          path: 'report.json'
+          if-no-files-found: error
+
+      - name: Check Vuln Count
+        id: vuln_count
+        run: |
+          report_file="report.json"
+          vuln_count=$(jq '.Results | length' "$report_file")
+          echo "vuln_count=$vuln_count" >> $GITHUB_OUTPUT
+
+      - name: Copa Action
+        if: steps.vuln_count.outputs.vuln_count != '0'
+        id: copa
+        # https://github.com/project-copacetic/copa-action
+        uses: project-copacetic/copa-action@v1.2.1
+        with:
+          image: ${{ env.IMAGE }}
+          image-report: 'report.json'
+          patched-tag: ${{ env.TAG }}
+          # https://github.com/moby/buildkit
+          buildkit-version: 'v0.12.4'
+          # https://github.com/project-copacetic/copacetic
+          copa-version: '0.6.0'
+
+      - name: Login to GitHub Container Registry
+        if: steps.copa.conclusion == 'success'
+        id: login
+        uses: docker/login-action@v3.1.0
+        with:
+          registry: ${{ inputs.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Docker Push Patched Image
+        if: steps.login.conclusion == 'success'
+        id: push
+        run: |
+          docker push ${{ steps.copa.outputs.patched-image }}
+
+      - name: Run Trivy in SBOM mode
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          format: 'github'
+          output: ${{ env.SBOM }}
+          image-ref: ${{ steps.copa.outputs.patched-image }}
+          github-pat: ${{ github.token }}
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.SBOM }}
+          path: ${{ env.SBOM }}
+          if-no-files-found: error
+
+      - name: Run Trivy scanner in SBOM mode (Output)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          format: 'table'
+          hide-progress: true
+          image-ref: ${{ steps.copa.outputs.patched-image }}
+          output: trivy-patched.md
+
+      - name: Publish Trivy Output to Summary
+        run: |
+          if [[ -s trivy-patched.md ]]; then
+            {
+              echo "### Patched SBOM Output"
+              echo "<details><summary>Click to expand</summary>"
+              echo ""
+              echo '```'
+              cat trivy-patched.md
+              echo '```'
+              echo "</details>"
+            } >> $GITHUB_STEP_SUMMARY
+          fi

@@ -1,0 +1,103 @@
+name: Build & Publish to Registry
+
+on:
+  workflow_call:
+    inputs:
+      ### Values from CICD Workflow ###
+      REGISTRY:
+        required: true
+        type: string
+        description: 'The Environemnt which should be used.'
+      ORGANISATION_NAME:
+        type: string
+        required: true
+        description: 'The Subscription ID which should be used.'
+      COMMIT_SHORT_SHA:
+        type: string
+        required: true
+        description: 'The Subscription ID which should be used.'
+
+env:
+  SBOM: '${{ inputs.COMMIT_SHORT_SHA }}-sbom.cdx.json'
+  IMAGE: '${{ inputs.REGISTRY }}/${{ inputs.ORGANISATION_NAME }}/example:${{ inputs.COMMIT_SHORT_SHA }}'
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read 
+      packages: write # needed for publishing the image to the GitHub Container Registry
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+
+      - name: Set up Docker Buildx
+        id: buildx
+        # https://github.com/docker/setup-buildx-action
+        uses: docker/setup-buildx-action@v3.3.0
+
+      - name: Login to GitHub Container Registry
+        # https://github.com/docker/login-action
+        uses: docker/login-action@v3.1.0
+        with:
+          registry: ${{ inputs.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push to GitHub Container Registry
+        # https://github.com/docker/build-push-action
+        uses: docker/build-push-action@v5.3.0
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          platforms: linux/amd64
+          push: true
+          sbom: false
+          context: ./
+          file: ./Dockerfile
+          tags: ${{ env.IMAGE }}
+
+      - name: Run Trivy in SBOM mode
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          format: 'github'
+          output: ${{ env.SBOM }}
+          image-ref: ${{ env.IMAGE }}
+          github-pat: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.SBOM }}
+          path: ${{ env.SBOM }}
+          if-no-files-found: error
+
+      - name: Run Trivy scanner in SBOM mode (Output)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          format: 'table'
+          hide-progress: true
+          image-ref: ${{ env.IMAGE }}
+          output: trivy.md
+
+      - name: Publish Trivy Output to Summary
+        run: |
+          if [[ -s trivy.md ]]; then
+            {
+              echo "### Security SBOM Output"
+              echo "<details><summary>Click to expand</summary>"
+              echo ""
+              echo '```'
+              cat trivy.md
+              echo '```'
+              echo "</details>"
+            } >> $GITHUB_STEP_SUMMARY
+          fi
