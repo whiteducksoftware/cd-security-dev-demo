@@ -18,15 +18,15 @@ on:
         description: 'The Subscription ID which should be used.'
 env:
   SBOM: '${{ inputs.COMMIT_SHORT_SHA }}-patched-sbom.cdx.json'
-  IMAGE: '${{ inputs.REGISTRY }}/${{ inputs.ORGANISATION_NAME }}/example:${{ inputs.COMMIT_SHORT_SHA }}-patched'
-  GHCR: '${{ inputs.REGISTRY }}/${{ inputs.ORGANISATION_NAME }}/example'
+  IMAGE: '${{ inputs.REGISTRY }}/${{ inputs.ORGANISATION_NAME }}/cd-security-dev-demo:${{ inputs.COMMIT_SHORT_SHA }}-patched'
+  GHCR: '${{ inputs.REGISTRY }}/${{ inputs.ORGANISATION_NAME }}/cd-security-dev-demo'
 
 jobs:
   sign-image:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: read 
+      contents: read
       packages: write # needed for publishing the patched image to the GitHub Container Registry
       id-token: write # needed for signing the images with GitHub OIDC Token
 
@@ -44,7 +44,7 @@ jobs:
         run: |
           DIGEST=$(crane digest ${{ env.IMAGE }})
           echo "DIGEST=$DIGEST" >> $GITHUB_OUTPUT
-     
+
       - name: Download SBOM artifact
         uses: actions/download-artifact@v4
         with:
@@ -58,7 +58,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Attach & sign SBOM 
+      - name: Attach & sign SBOM
         run: cosign attest --yes -predicate ${{ env.SBOM }} ${{ env.IMAGE }} --type=cyclonedx
 
       - name: Sign the OCI artifact

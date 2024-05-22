@@ -15,7 +15,7 @@ defaults:
 
 env:
   REGISTRY: ghcr.io
-  ORGANISATION_NAME: philwelz
+  ORGANISATION_NAME: whiteducksoftware
 
 jobs:
   prepare:
@@ -59,4 +59,3 @@ jobs:
       REGISTRY: ${{ needs.prepare.outputs.REGISTRY }}
       ORGANISATION_NAME: ${{ needs.prepare.outputs.ORGANISATION_NAME }}
       COMMIT_SHORT_SHA: ${{ needs.prepare.outputs.SHA_SHORT }}
-    

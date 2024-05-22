@@ -19,7 +19,7 @@ on:
 
 env:
   SBOM: '${{ inputs.COMMIT_SHORT_SHA }}-patched-sbom.cdx.json'
-  IMAGE: '${{ inputs.REGISTRY }}/${{ inputs.ORGANISATION_NAME }}/example:${{ inputs.COMMIT_SHORT_SHA }}'
+  IMAGE: '${{ inputs.REGISTRY }}/${{ inputs.ORGANISATION_NAME }}/cd-security-dev-demo:${{ inputs.COMMIT_SHORT_SHA }}'
   TAG: '${{ inputs.COMMIT_SHORT_SHA }}-patched'
 
 jobs:

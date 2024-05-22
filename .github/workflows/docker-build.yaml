@@ -19,14 +19,14 @@ on:
 
 env:
   SBOM: '${{ inputs.COMMIT_SHORT_SHA }}-sbom.cdx.json'
-  IMAGE: '${{ inputs.REGISTRY }}/${{ inputs.ORGANISATION_NAME }}/example:${{ inputs.COMMIT_SHORT_SHA }}'
+  IMAGE: '${{ inputs.REGISTRY }}/${{ inputs.ORGANISATION_NAME }}/cd-security-dev-demo:${{ inputs.COMMIT_SHORT_SHA }}'
 
 jobs:
   docker-build:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: read 
+      contents: read
       packages: write # needed for publishing the image to the GitHub Container Registry
 
     steps:
