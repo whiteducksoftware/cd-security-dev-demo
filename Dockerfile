@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0.101-jammy-amd64 AS build
+FROM mcr.microsoft.com/dotnet/sdk:8.0.301-jammy-amd64 AS build
 WORKDIR /source
 
 COPY . .
