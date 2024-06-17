@@ -37,7 +37,7 @@ jobs:
 
       - name: Install Crane
       # https://github.com/imjasonh/setup-crane
-        uses: imjasonh/setup-crane@v0.3
+        uses: imjasonh/setup-crane@v0.4
 
       - name: Get Digest
         id: crane
