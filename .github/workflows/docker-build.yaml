@@ -45,7 +45,7 @@ jobs:
 
       - name: Login to GitHub Container Registry
         # https://github.com/docker/login-action
-        uses: docker/login-action@v3.1.0
+        uses: docker/login-action@v3.3.0
         with:
           registry: ${{ inputs.REGISTRY }}
           username: ${{ github.actor }}
