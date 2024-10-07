@@ -33,7 +33,7 @@ jobs:
     steps:
       - name: Install Cosign
         # https://github.com/sigstore/cosign-installer
-        uses: sigstore/cosign-installer@v3.6.0
+        uses: sigstore/cosign-installer@v3.7.0
 
       - name: Install Crane
       # https://github.com/imjasonh/setup-crane
